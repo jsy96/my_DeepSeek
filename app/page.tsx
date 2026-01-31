@@ -1,34 +1,116 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
 };
 
-// Format message content with clickable links
-function formatMessage(content: string) {
-  // Convert URLs to clickable links
-  const urlRegex = /(https?:\/\/[^\s\])]+)/g;
-  const parts = content.split(urlRegex);
-
-  return parts.map((part, i) => {
-    if (part.match(urlRegex)) {
-      return (
-        <a
-          key={i}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-purple-300 hover:text-purple-200 underline"
-        >
-          {part}
-        </a>
-      );
-    }
-    return part;
-  });
+// Custom Markdown renderer with styled components
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeRaw]}
+      components={{
+        // Paragraphs
+        p: ({ children }) => (
+          <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
+        ),
+        // Headings
+        h1: ({ children }) => (
+          <h1 className="text-xl font-bold mb-3 mt-4 text-white">{children}</h1>
+        ),
+        h2: ({ children }) => (
+          <h2 className="text-lg font-semibold mb-2 mt-3 text-white/90">{children}</h2>
+        ),
+        h3: ({ children }) => (
+          <h3 className="text-base font-semibold mb-2 mt-2 text-white/80">{children}</h3>
+        ),
+        // Lists
+        ul: ({ children }) => (
+          <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal list-inside mb-2 space-y-1 text-white/80">{children}</ol>
+        ),
+        li: ({ children }) => (
+          <li className="ml-2">{children}</li>
+        ),
+        // Code
+        code: ({ className, children, ...props }: any) => {
+          const match = /language-(\w+)/.exec(className || "");
+          return match ? (
+            <code className={`${className} block bg-black/30 p-3 rounded-lg my-2 text-sm overflow-x-auto`} {...props}>
+              {children}
+            </code>
+          ) : (
+            <code className="bg-white/10 px-1.5 py-0.5 rounded text-sm text-purple-300" {...props}>
+              {children}
+            </code>
+          );
+        },
+        // Links
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-300 hover:text-purple-200 underline"
+          >
+            {children}
+          </a>
+        ),
+        // Blockquotes
+        blockquote: ({ children }) => (
+          <blockquote className="border-l-4 border-purple-400/50 pl-4 py-1 my-2 bg-white/5 italic text-white/70">
+            {children}
+          </blockquote>
+        ),
+        // Bold
+        strong: ({ children }) => (
+          <strong className="font-bold text-white">{children}</strong>
+        ),
+        // Italic
+        em: ({ children }) => (
+          <em className="italic text-white/80">{children}</em>
+        ),
+        // Horizontal rule
+        hr: () => (
+          <hr className="border-white/20 my-3" />
+        ),
+        // Tables (for GFM)
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-2">
+            <table className="min-w-full divide-y divide-white/20 text-white/80">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => (
+          <thead className="bg-white/10">{children}</thead>
+        ),
+        tbody: ({ children }) => (
+          <tbody className="divide-y divide-white/10">{children}</tbody>
+        ),
+        tr: ({ children }) => (
+          <tr>{children}</tr>
+        ),
+        th: ({ children }) => (
+          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-white/90">
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td className="px-3 py-2 text-sm whitespace-nowrap">{children}</td>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 }
 
 export default function Home() {
@@ -121,7 +203,13 @@ export default function Home() {
                       ? "bg-blue-500 text-white rounded-br-md"
                       : "bg-white/10 text-white/90 rounded-bl-md border border-white/10"
                   }`}>
-                    <div className="whitespace-pre-wrap break-words">{formatMessage(msg.content)}</div>
+                    {msg.role === "assistant" ? (
+                      <div className="prose prose-invert prose-sm max-w-none">
+                        <MarkdownContent content={msg.content} />
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    )}
                   </div>
                 </div>
               </div>
