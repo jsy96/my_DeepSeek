@@ -13,7 +13,8 @@
       "Bash(ffmpeg:*)",
       "Bash(ls:*)",
       "Bash(npm uninstall:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git remote get-url:*)"
     ]
   }
 }

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { supabase, generateChatId, type ChatSession } from "@/lib/supabase";
+import { supabase, generateChatId, type ChatSession } from "./lib/supabase";
 
 type Message = {
   role: "user" | "assistant";
