@@ -1,6 +1,6 @@
 # My AI Website
 
-一个简单的个人网页，接入 AI 对话功能，调用 DeepSeek API，支持网络搜索和图片查找。
+一个简单的个人网页，接入 AI 对话功能，调用 DeepSeek API，支持网络搜索、图片查找和图片识别。
 
 ## 功能
 
@@ -8,7 +8,9 @@
 - Edge Runtime 部署，低延迟
 - 可自定义 system prompt，配置 AI 人设和背景信息
 - **MCP 工具能力**：网络搜索、图片搜索
+- **图片识别**：发送图片让 AI 识别内容
 - 美观的渐变 UI 设计
+- Markdown 渲染支持
 
 ## MCP 工具能力
 
@@ -17,15 +19,18 @@ AI 可以使用以下工具获取信息：
 | 工具 | 功能 | API 服务 |
 |------|------|----------|
 | 网络搜索 | 搜索最新网络信息 | Tavily API |
-| 图片搜索 | 搜索高质量图片 | Unsplash API |
+| 图片搜索 | 搜索高质量图片链接 | Unsplash API |
+| 图片识别 | 识别用户上传的图片内容 | 通义千问 VL |
 
 ### 使用示例
 
-用户可以自然地提出需求，AI 会自动判断是否需要使用工具：
-
-- "帮我搜索一下2024年遥感技术的最新进展"
+**网络搜索 & 图片搜索：**
+- "搜索2024年遥感技术的最新进展"
 - "找一些卫星图像的图片"
-- "最近有什么热门的AI新闻？"
+
+**图片识别：**
+- 点击图片按钮上传图片
+- AI 会识别图片内容并回答相关问题
 
 ## 本地开发
 
@@ -45,6 +50,9 @@ TAVILY_API_KEY=your_tavily_api_key_here
 
 # 可选 - 图片搜索功能
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key_here
+
+# 可选 - 图片识别功能
+QWEN_API_KEY=your_qwen_api_key_here
 ```
 
 2. 安装依赖并启动
@@ -63,6 +71,7 @@ npm run dev
 | DeepSeek | https://platform.deepseek.com/ | 按量付费 |
 | Tavily (搜索) | https://tavily.com/ | 1000次/月 |
 | Unsplash (图片) | https://unsplash.com/developers | 5000次/小时 |
+| 通义千问 (识别) | https://dashscope.aliyuncs.com/ | 按量付费 |
 
 ## 部署到 Vercel
 
@@ -85,6 +94,7 @@ vercel
 | `DEEPSEEK_SYSTEM_PROMPT` | AI 人设配置 | 是 |
 | `TAVILY_API_KEY` | 网络搜索功能 | 否 |
 | `UNSPLASH_ACCESS_KEY` | 图片搜索功能 | 否 |
+| `QWEN_API_KEY` | 图片识别功能 | 否 |
 
 ## 项目结构
 
@@ -93,9 +103,10 @@ vercel
 ├── app/
 │   ├── api/
 │   │   └── chat/
-│   │       └── route.ts     # Edge API Route (含工具调用)
+│   │       └── route.ts     # Edge API Route
 │   ├── lib/
-│   │   └── tools.ts         # 搜索工具函数
+│   │   ├── tools.ts         # 搜索工具函数
+│   │   └── vision.ts        # 图片识别函数
 │   ├── layout.tsx
 │   ├── page.tsx             # 聊天界面
 │   └── globals.css
@@ -111,6 +122,8 @@ vercel
 - TypeScript
 - Tailwind CSS
 - Edge Runtime
-- DeepSeek API
-- Tavily API (可选)
-- Unsplash API (可选)
+- DeepSeek API (对话)
+- Tavily API (网络搜索)
+- Unsplash API (图片搜索)
+- 通义千问 VL (图片识别)
+- react-markdown (Markdown 渲染)

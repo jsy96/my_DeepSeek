@@ -2,6 +2,7 @@
 export const runtime = "edge";
 
 import { searchWeb, searchImages, detectToolNeeds } from "../../lib/tools";
+import { recognizeImageWithQwen, resizeImage } from "../../lib/vision";
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -10,16 +11,18 @@ interface Message {
 
 interface RequestBody {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
+  image?: string;
 }
 
 export async function POST(request: Request) {
   try {
-    const { messages }: RequestBody = await request.json();
+    const { messages, image }: RequestBody = await request.json();
 
     // Get environment variables
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const searchApiKey = process.env.TAVILY_API_KEY || "";
     const imageApiKey = process.env.UNSPLASH_ACCESS_KEY || "";
+    const visionApiKey = process.env.QWEN_API_KEY || "";
 
     const basePrompt = process.env.DEEPSEEK_SYSTEM_PROMPT ||
       "You are a helpful AI assistant.";
@@ -39,9 +42,31 @@ export async function POST(request: Request) {
       toolContext += `\n\n[图片搜索结果]\n${imageResult}`;
     }
 
+    // Handle image recognition
+    let visionContext = "";
+    if (image && visionApiKey) {
+      try {
+        // Resize image to reduce size
+        // Note: In Edge Runtime, we can't use canvas, so we send the image as-is
+        // For production, you might want to resize on the client side
+        const imageDescription = await recognizeImageWithQwen(image, visionApiKey);
+        visionContext = `\n\n[用户发送了一张图片]\n图片内容识别: ${imageDescription}\n`;
+      } catch (error) {
+        console.error("Vision API error:", error);
+        visionContext = "\n\n[用户发送了一张图片，但识别失败]\n";
+      }
+    } else if (image && !visionApiKey) {
+      visionContext = "\n\n[用户发送了一张图片，但图片识别功能未配置]\n";
+    }
+
     // Enhanced system prompt
-    const systemPrompt = basePrompt +
-      (toolContext ? `\n\n你刚刚调用了搜索工具，获得了以下信息，请基于这些信息回答用户：${toolContext}\n\n请将搜索结果整理后用友好的方式展示给用户。` : "");
+    let systemPrompt = basePrompt;
+    if (toolContext) {
+      systemPrompt += `\n\n你刚刚调用了搜索工具，获得了以下信息：${toolContext}\n\n请将搜索结果整理后用友好的方式展示给用户。`;
+    }
+    if (visionContext) {
+      systemPrompt += visionContext + "请根据图片内容回答用户的问题。";
+    }
 
     if (!apiKey) {
       return new Response(

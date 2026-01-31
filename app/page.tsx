@@ -8,6 +8,7 @@ import rehypeRaw from "rehype-raw";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  image?: string;
 };
 
 // Custom Markdown renderer with styled components
@@ -17,11 +18,9 @@ function MarkdownContent({ content }: { content: string }) {
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeRaw]}
       components={{
-        // Paragraphs
         p: ({ children }) => (
           <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
         ),
-        // Headings
         h1: ({ children }) => (
           <h1 className="text-xl font-bold mb-3 mt-4 text-white">{children}</h1>
         ),
@@ -31,7 +30,6 @@ function MarkdownContent({ content }: { content: string }) {
         h3: ({ children }) => (
           <h3 className="text-base font-semibold mb-2 mt-2 text-white/80">{children}</h3>
         ),
-        // Lists
         ul: ({ children }) => (
           <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>
         ),
@@ -41,7 +39,6 @@ function MarkdownContent({ content }: { content: string }) {
         li: ({ children }) => (
           <li className="ml-2">{children}</li>
         ),
-        // Code
         code: ({ className, children, ...props }: any) => {
           const match = /language-(\w+)/.exec(className || "");
           return match ? (
@@ -54,7 +51,6 @@ function MarkdownContent({ content }: { content: string }) {
             </code>
           );
         },
-        // Links
         a: ({ href, children }) => (
           <a
             href={href}
@@ -65,25 +61,20 @@ function MarkdownContent({ content }: { content: string }) {
             {children}
           </a>
         ),
-        // Blockquotes
         blockquote: ({ children }) => (
           <blockquote className="border-l-4 border-purple-400/50 pl-4 py-1 my-2 bg-white/5 italic text-white/70">
             {children}
           </blockquote>
         ),
-        // Bold
         strong: ({ children }) => (
           <strong className="font-bold text-white">{children}</strong>
         ),
-        // Italic
         em: ({ children }) => (
           <em className="italic text-white/80">{children}</em>
         ),
-        // Horizontal rule
         hr: () => (
           <hr className="border-white/20 my-3" />
         ),
-        // Tables (for GFM)
         table: ({ children }) => (
           <div className="overflow-x-auto my-2">
             <table className="min-w-full divide-y divide-white/20 text-white/80">{children}</table>
@@ -117,7 +108,10 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -127,20 +121,55 @@ export default function Home() {
     scrollToBottom();
   }, [messages, loading]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-    const userMessage: Message = { role: "user", content: input };
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim() && !selectedImage) return;
+
+    let imageData = selectedImage;
+
+    const userMessage: Message = {
+      role: "user",
+      content: input || (selectedImage ? "[图片]" : ""),
+      image: selectedImage || undefined,
+    };
+
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
+    setSelectedImage(null);
+    setImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
     setLoading(true);
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          image: imageData,
+        }),
       });
 
       const data = await response.json();
@@ -180,7 +209,7 @@ export default function Home() {
                 </svg>
               </div>
               <p className="text-lg">和老金聊聊吧</p>
-              <p className="text-sm mt-2 text-white/40">测绘遥感、编程问题、网络搜索、图片查找</p>
+              <p className="text-sm mt-2 text-white/40">支持文字对话、发送图片识别</p>
             </div>
           ) : (
             messages.map((msg, i) => (
@@ -203,6 +232,9 @@ export default function Home() {
                       ? "bg-blue-500 text-white rounded-br-md"
                       : "bg-white/10 text-white/90 rounded-bl-md border border-white/10"
                   }`}>
+                    {msg.image && (
+                      <img src={msg.image} alt="Uploaded" className="max-w-full rounded-lg mb-2" />
+                    )}
                     {msg.role === "assistant" ? (
                       <div className="prose prose-invert prose-sm max-w-none">
                         <MarkdownContent content={msg.content} />
@@ -235,32 +267,66 @@ export default function Home() {
         </div>
 
         {/* Input Area */}
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-            placeholder="输入消息..."
-            className="flex-1 px-5 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-transparent backdrop-blur-sm transition-all"
-            disabled={loading}
-          />
-          <button
-            onClick={sendMessage}
-            disabled={loading || !input.trim()}
-            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-purple-500/25 font-medium"
-          >
-            {loading ? (
-              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : (
+        <div className="space-y-3">
+          {/* Image Preview */}
+          {selectedImage && (
+            <div className="flex items-center gap-3 px-3">
+              <div className="relative">
+                <img src={selectedImage} alt="Preview" className="w-16 h-16 object-cover rounded-lg border border-white/20" />
+                <button
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs hover:bg-red-600"
+                >
+                  ×
+                </button>
+              </div>
+              <span className="text-white/60 text-sm">已选择图片</span>
+            </div>
+          )}
+
+          {/* Text Input + Actions */}
+          <div className="flex gap-3">
+            {/* Image Upload Button */}
+            <label className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white/60 hover:text-white hover:bg-white/15 cursor-pointer transition-all flex items-center justify-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+                disabled={loading}
+              />
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-            )}
-          </button>
+            </label>
+
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+              placeholder="输入消息..."
+              className="flex-1 px-5 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-transparent backdrop-blur-sm transition-all"
+              disabled={loading}
+            />
+            <button
+              onClick={sendMessage}
+              disabled={loading || (!input.trim() && !selectedImage)}
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-purple-500/25 font-medium"
+            >
+              {loading ? (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </main>
     </div>
