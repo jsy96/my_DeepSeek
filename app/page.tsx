@@ -200,11 +200,13 @@ export default function Home() {
         {/* Header */}
         <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-lg">
-            金
-          </div>
+          <img
+            src="/avatar.jpg"
+            alt="Eunice"
+            className="w-10 h-10 rounded-full object-cover shadow-lg border-2 border-white/20"
+          />
           <div>
-            <h1 className="text-white font-semibold text-lg">老金的AI助手</h1>
+            <h1 className="text-white font-semibold text-lg">Eunice的AI助手</h1>
             <p className="text-white/60 text-sm">测绘遥感 · 图像处理 · 码农日常</p>
           </div>
         </div>
@@ -221,7 +223,7 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
-              <p className="text-lg">和老金聊聊吧</p>
+              <p className="text-lg">和Eunice聊聊吧</p>
               <p className="text-sm mt-2 text-white/40">支持文字对话、发送图片识别</p>
             </div>
           ) : (
@@ -232,13 +234,17 @@ export default function Home() {
               >
                 <div className={`flex gap-3 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
                   {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium ${
-                    msg.role === "user"
-                      ? "bg-gradient-to-br from-blue-400 to-blue-600 text-white"
-                      : "bg-gradient-to-br from-purple-400 to-pink-400 text-white"
-                  }`}>
-                    {msg.role === "user" ? "我" : "金"}
-                  </div>
+                  {msg.role === "assistant" ? (
+                    <img
+                      src="/avatar.jpg"
+                      alt="Eunice"
+                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-white/20"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium bg-gradient-to-br from-blue-400 to-blue-600 text-white">
+                      我
+                    </div>
+                  )}
                   {/* Message */}
                   <div className={`px-4 py-2.5 rounded-2xl ${
                     msg.role === "user"
@@ -263,9 +269,11 @@ export default function Home() {
           {loading && (
             <div className="flex justify-start animate-fade-in">
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-sm font-medium text-white">
-                  金
-                </div>
+                <img
+                  src="/avatar.jpg"
+                  alt="Eunice"
+                  className="w-8 h-8 rounded-full object-cover border border-white/20"
+                />
                 <div className="px-4 py-3 rounded-2xl bg-white/10 border border-white/10 rounded-bl-md">
                   <div className="flex gap-1">
                     <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
