@@ -57,7 +57,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-white font-semibold text-lg">老金的AI助手</h1>
-            <p className="text-white/60 text-sm">卫星遥感 · 图像处理 · 码农日常</p>
+            <p className="text-white/60 text-sm">测绘遥感 · 图像处理 · 码农日常</p>
           </div>
         </div>
       </header>
