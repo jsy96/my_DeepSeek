@@ -30,11 +30,11 @@ ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 -- 允许所有人读取和写入（实际应用中应该根据用户 ID 限制）
 DROP POLICY IF EXISTS "Allow public access to chat_sessions" ON chat_sessions;
 CREATE POLICY "Allow public access to chat_sessions" ON chat_sessions
-  FOR ALL USING CHECK (true);
+  FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Allow public access to chat_messages" ON chat_messages;
 CREATE POLICY "Allow public access to chat_messages" ON chat_messages
-  FOR ALL USING CHECK (true);
+  FOR ALL USING (true) WITH CHECK (true);
 
 -- 更新时间戳的函数
 CREATE OR REPLACE FUNCTION update_updated_at_column()
