@@ -183,9 +183,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header */}
-      <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
+    <div className="min-h-screen relative">
+      {/* Background Image */}
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/background.png')",
+          filter: "brightness(0.3) saturate(0.7)",
+        }}
+      />
+      {/* Dark Overlay */}
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px]" />
+
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Header */}
+        <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-lg">
             金
@@ -329,6 +342,7 @@ export default function Home() {
           </div>
         </div>
       </main>
+      </div>
     </div>
   );
 }
