@@ -326,7 +326,7 @@ export default function Home() {
               className="w-10 h-10 rounded-full object-cover shadow-lg border-2 border-white/20"
             />
             <div className="flex-1">
-              <h1 className="text-white font-semibold text-lg">Eunice 的 AI 助手</h1>
+              <h1 className="text-white font-semibold text-lg">Eunice AI 助手</h1>
               <p className="text-white/60 text-sm">测绘遥感 · 图像处理 · 码农日常</p>
             </div>
             <button
