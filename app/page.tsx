@@ -7,6 +7,30 @@ type Message = {
   content: string;
 };
 
+// Format message content with clickable links
+function formatMessage(content: string) {
+  // Convert URLs to clickable links
+  const urlRegex = /(https?:\/\/[^\s\])]+)/g;
+  const parts = content.split(urlRegex);
+
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-purple-300 hover:text-purple-200 underline"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -74,7 +98,7 @@ export default function Home() {
                 </svg>
               </div>
               <p className="text-lg">和老金聊聊吧</p>
-              <p className="text-sm mt-2 text-white/40">遥感图像处理、编程问题、日常闲聊</p>
+              <p className="text-sm mt-2 text-white/40">测绘遥感、编程问题、网络搜索、图片查找</p>
             </div>
           ) : (
             messages.map((msg, i) => (
@@ -97,7 +121,7 @@ export default function Home() {
                       ? "bg-blue-500 text-white rounded-br-md"
                       : "bg-white/10 text-white/90 rounded-bl-md border border-white/10"
                   }`}>
-                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    <div className="whitespace-pre-wrap break-words">{formatMessage(msg.content)}</div>
                   </div>
                 </div>
               </div>
