@@ -9,6 +9,7 @@
 - 可自定义 system prompt，配置 AI 人设和背景信息
 - **MCP 工具能力**：网络搜索、图片搜索
 - **图片识别**：发送图片让 AI 识别内容
+- **聊天记录保存**：使用 Supabase 云端存储
 - 美观的渐变 UI 设计
 - Markdown 渲染支持
 
@@ -43,7 +44,7 @@ AI 可以使用以下工具获取信息：
 DEEPSEEK_API_KEY=your_actual_api_key_here
 
 # 必填 - AI 人设配置
-DEEPSEEK_SYSTEM_PROMPT=你叫老金，是一位码农...
+DEEPSEEK_SYSTEM_PROMPT=你叫Eunice，是一位码农...
 
 # 可选 - 网络搜索功能
 TAVILY_API_KEY=your_tavily_api_key_here
@@ -53,6 +54,10 @@ UNSPLASH_ACCESS_KEY=your_unsplash_access_key_here
 
 # 可选 - 图片识别功能
 QWEN_API_KEY=your_qwen_api_key_here
+
+# 必填 - Supabase 配置（聊天记录存储）
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 2. 安装依赖并启动
@@ -72,6 +77,46 @@ npm run dev
 | Tavily (搜索) | https://tavily.com/ | 1000次/月 |
 | Unsplash (图片) | https://unsplash.com/developers | 5000次/小时 |
 | 通义千问 (识别) | https://dashscope.aliyuncs.com/ | 按量付费 |
+| Supabase | https://supabase.com/ | 500MB 数据库 |
+
+## Supabase 设置（聊天记录存储）
+
+### 1. 创建 Supabase 项目
+
+1. 访问 [https://supabase.com](https://supabase.com)
+2. 注册/登录账号
+3. 点击 "New Project" 创建新项目
+4. 设置项目名称和密码，等待数据库创建完成
+
+### 2. 执行 SQL 创建表
+
+在 Supabase Dashboard -> SQL Editor 中执行 `supabase-tables.sql` 文件中的 SQL，创建聊天记录相关表：
+
+```sql
+-- 创建聊天会话表
+CREATE TABLE IF NOT EXISTS chat_sessions (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 创建聊天消息表
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  image TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### 3. 获取环境变量
+
+在 Supabase Dashboard -> Project Settings -> API 中获取：
+- `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+- `anon public key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 ## 部署到 Vercel
 
@@ -92,6 +137,8 @@ vercel
 |--------|------|------|
 | `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | 是 |
 | `DEEPSEEK_SYSTEM_PROMPT` | AI 人设配置 | 是 |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 项目 URL | 是 |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 匿名密钥 | 是 |
 | `TAVILY_API_KEY` | 网络搜索功能 | 否 |
 | `UNSPLASH_ACCESS_KEY` | 图片搜索功能 | 否 |
 | `QWEN_API_KEY` | 图片识别功能 | 否 |
@@ -106,11 +153,13 @@ vercel
 │   │       └── route.ts     # Edge API Route
 │   ├── lib/
 │   │   ├── tools.ts         # 搜索工具函数
-│   │   └── vision.ts        # 图片识别函数
+│   │   ├── vision.ts        # 图片识别函数
+│   │   └── supabase.ts      # Supabase 客户端配置
 │   ├── layout.tsx
 │   ├── page.tsx             # 聊天界面
 │   └── globals.css
 ├── .env.local               # 本地环境变量
+├── supabase-tables.sql      # Supabase 表结构 SQL
 ├── package.json
 └── tsconfig.json
 ```
@@ -126,4 +175,5 @@ vercel
 - Tavily API (网络搜索)
 - Unsplash API (图片搜索)
 - 通义千问 VL (图片识别)
+- Supabase (聊天记录存储)
 - react-markdown (Markdown 渲染)

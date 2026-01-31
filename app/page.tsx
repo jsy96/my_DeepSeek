@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import { supabase, generateChatId, type ChatSession } from "@/lib/supabase";
 
 type Message = {
   role: "user" | "assistant";
@@ -11,41 +12,20 @@ type Message = {
   image?: string;
 };
 
-type ChatSession = {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-};
-
-// Custom Markdown renderer with styled components
+// Custom Markdown renderer
 function MarkdownContent({ content }: { content: string }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeRaw]}
       components={{
-        p: ({ children }) => (
-          <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
-        ),
-        h1: ({ children }) => (
-          <h1 className="text-xl font-bold mb-3 mt-4 text-white">{children}</h1>
-        ),
-        h2: ({ children }) => (
-          <h2 className="text-lg font-semibold mb-2 mt-3 text-white/90">{children}</h2>
-        ),
-        h3: ({ children }) => (
-          <h3 className="text-base font-semibold mb-2 mt-2 text-white/80">{children}</h3>
-        ),
-        ul: ({ children }) => (
-          <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>
-        ),
-        ol: ({ children }) => (
-          <ol className="list-decimal list-inside mb-2 space-y-1 text-white/80">{children}</ol>
-        ),
-        li: ({ children }) => (
-          <li className="ml-2">{children}</li>
-        ),
+        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+        h1: ({ children }) => <h1 className="text-xl font-bold mb-3 mt-4 text-white">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-lg font-semibold mb-2 mt-3 text-white/90">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-base font-semibold mb-2 mt-2 text-white/80">{children}</h3>,
+        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1 text-white/80">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1 text-white/80">{children}</ol>,
+        li: ({ children }) => <li className="ml-2">{children}</li>,
         code: ({ className, children, ...props }: any) => {
           const match = /language-(\w+)/.exec(className || "");
           return match ? (
@@ -59,12 +39,7 @@ function MarkdownContent({ content }: { content: string }) {
           );
         },
         a: ({ href, children }) => (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-purple-300 hover:text-purple-200 underline"
-          >
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-purple-300 hover:text-purple-200 underline">
             {children}
           </a>
         ),
@@ -73,37 +48,23 @@ function MarkdownContent({ content }: { content: string }) {
             {children}
           </blockquote>
         ),
-        strong: ({ children }) => (
-          <strong className="font-bold text-white">{children}</strong>
-        ),
-        em: ({ children }) => (
-          <em className="italic text-white/80">{children}</em>
-        ),
-        hr: () => (
-          <hr className="border-white/20 my-3" />
-        ),
+        strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+        em: ({ children }) => <em className="italic text-white/80">{children}</em>,
+        hr: () => <hr className="border-white/20 my-3" />,
         table: ({ children }) => (
           <div className="overflow-x-auto my-2">
             <table className="min-w-full divide-y divide-white/20 text-white/80">{children}</table>
           </div>
         ),
-        thead: ({ children }) => (
-          <thead className="bg-white/10">{children}</thead>
-        ),
-        tbody: ({ children }) => (
-          <tbody className="divide-y divide-white/10">{children}</tbody>
-        ),
-        tr: ({ children }) => (
-          <tr>{children}</tr>
-        ),
+        thead: ({ children }) => <thead className="bg-white/10">{children}</thead>,
+        tbody: ({ children }) => <tbody className="divide-y divide-white/10">{children}</tbody>,
+        tr: ({ children }) => <tr>{children}</tr>,
         th: ({ children }) => (
           <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-white/90">
             {children}
           </th>
         ),
-        td: ({ children }) => (
-          <td className="px-3 py-2 text-sm whitespace-nowrap">{children}</td>
-        ),
+        td: ({ children }) => <td className="px-3 py-2 text-sm whitespace-nowrap">{children}</td>,
       }}
     >
       {content}
@@ -121,7 +82,6 @@ export default function Home() {
   const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load sessions on mount
   useEffect(() => {
@@ -138,44 +98,43 @@ export default function Home() {
 
   const loadSessions = async () => {
     try {
-      const response = await fetch("/api/chats");
-      const data = await response.json();
-      setSessions(data.sessions || []);
+      const { data, error } = await supabase
+        .from("chat_sessions")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error("Error loading sessions:", error);
+        return;
+      }
+
+      setSessions(data || []);
     } catch (error) {
       console.error("Error loading sessions:", error);
     }
   };
 
-  const saveMessages = async () => {
-    if (!currentSessionId) return;
-
-    try {
-      // Generate title from first user message
-      const firstUserMessage = messages.find(m => m.role === "user");
-      const title = firstUserMessage?.content.substring(0, 30) || "新对话";
-
-      await fetch(`/api/chats/${currentSessionId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages }),
-      });
-
-      // Also update session title
-      await fetch("/api/chats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: currentSessionId, title }),
-      });
-    } catch (error) {
-      console.error("Error saving messages:", error);
-    }
-  };
-
   const loadSession = async (sessionId: string) => {
     try {
-      const response = await fetch(`/api/chats/${sessionId}`);
-      const data = await response.json();
-      setMessages(data.messages || []);
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Error loading messages:", error);
+        return;
+      }
+
+      const loadedMessages: Message[] = (data || []).map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        image: msg.image || undefined,
+      }));
+
+      setMessages(loadedMessages);
       setCurrentSessionId(sessionId);
       setShowHistory(false);
     } catch (error) {
@@ -183,9 +142,61 @@ export default function Home() {
     }
   };
 
+  const saveMessages = async (sessionId: string, messagesToSave: Message[]) => {
+    try {
+      // Generate title from first user message
+      const firstUserMessage = messagesToSave.find((m) => m.role === "user");
+      const title = firstUserMessage?.content.substring(0, 30) || "新对话";
+
+      // Check if session exists
+      const { data: existingSession } = await supabase
+        .from("chat_sessions")
+        .select("id")
+        .eq("id", sessionId)
+        .single();
+
+      if (!existingSession) {
+        // Create new session
+        await supabase.from("chat_sessions").insert({
+          id: sessionId,
+          title: title,
+        });
+      } else {
+        // Update session title
+        await supabase
+          .from("chat_sessions")
+          .update({ title })
+          .eq("id", sessionId);
+      }
+
+      // Delete old messages for this session
+      await supabase
+        .from("chat_messages")
+        .delete()
+        .eq("session_id", sessionId);
+
+      // Insert all messages
+      const messagesToInsert = messagesToSave.map((msg) => ({
+        session_id: sessionId,
+        role: msg.role,
+        content: msg.content,
+        image: msg.image || null,
+      }));
+
+      if (messagesToInsert.length > 0) {
+        await supabase.from("chat_messages").insert(messagesToInsert);
+      }
+
+      // Reload sessions list
+      await loadSessions();
+    } catch (error) {
+      console.error("Error saving messages:", error);
+    }
+  };
+
   const newChat = () => {
     setMessages([]);
-    setCurrentSessionId(`chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+    setCurrentSessionId(generateChatId());
     setShowHistory(false);
     setInput("");
     setSelectedImage(null);
@@ -195,9 +206,11 @@ export default function Home() {
     e.stopPropagation();
 
     try {
-      await fetch(`/api/chats?sessionId=${sessionId}`, {
-        method: "DELETE",
-      });
+      // Delete messages (cascade will handle this, but let's be explicit)
+      await supabase.from("chat_messages").delete().eq("session_id", sessionId);
+
+      // Delete session
+      await supabase.from("chat_sessions").delete().eq("id", sessionId);
 
       // Reload sessions
       await loadSessions();
@@ -237,7 +250,7 @@ export default function Home() {
     // Create new session if needed
     let sessionId = currentSessionId;
     if (!sessionId) {
-      sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      sessionId = generateChatId();
       setCurrentSessionId(sessionId);
     }
 
@@ -261,7 +274,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
           image: imageData,
         }),
       });
@@ -270,11 +283,8 @@ export default function Home() {
       const finalMessages = [...newMessages, { role: "assistant" as const, content: data.message }];
       setMessages(finalMessages);
 
-      // Save messages after receiving AI response
-      await saveMessages();
-
-      // Refresh sessions list to show updated title
-      await loadSessions();
+      // Save to Supabase after receiving AI response
+      await saveMessages(sessionId, finalMessages);
     } catch (error) {
       console.error("Error:", error);
       setMessages([...newMessages, { role: "assistant", content: "抱歉，出了点问题，请稍后再试。" }]);
@@ -353,16 +363,14 @@ export default function Home() {
                       key={session.id}
                       onClick={() => loadSession(session.id)}
                       className={`group p-3 rounded-lg cursor-pointer transition-colors mb-1 ${
-                        currentSessionId === session.id
-                          ? "bg-white/10"
-                          : "hover:bg-white/5"
+                        currentSessionId === session.id ? "bg-white/10" : "hover:bg-white/5"
                       }`}
                     >
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
                           <p className="text-white/90 text-sm truncate">{session.title}</p>
                           <p className="text-white/40 text-xs mt-1">
-                            {new Date(session.updatedAt).toLocaleDateString()}
+                            {new Date(session.updated_at).toLocaleDateString()}
                           </p>
                         </div>
                         <button
@@ -421,9 +429,7 @@ export default function Home() {
                         ? "bg-blue-500 text-white rounded-br-md"
                         : "bg-white/10 text-white/90 rounded-bl-md border border-white/10"
                     }`}>
-                      {msg.image && (
-                        <img src={msg.image} alt="Uploaded" className="max-w-full rounded-lg mb-2" />
-                      )}
+                      {msg.image && <img src={msg.image} alt="Uploaded" className="max-w-full rounded-lg mb-2" />}
                       {msg.role === "assistant" ? (
                         <div className="prose prose-invert prose-sm max-w-none">
                           <MarkdownContent content={msg.content} />
@@ -509,7 +515,7 @@ export default function Home() {
                 {loading ? (
                   <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 ) : (
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

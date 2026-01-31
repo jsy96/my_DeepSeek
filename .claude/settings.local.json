@@ -11,7 +11,9 @@
       "Bash(git push:*)",
       "Bash(npm run build:*)",
       "Bash(ffmpeg:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(cd:*)"
     ]
   }
 }
