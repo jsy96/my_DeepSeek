@@ -7,9 +7,10 @@ interface SearchResult {
 }
 
 interface ImageResult {
+  urls?: { regular?: string };
+  description?: string;
   url: string;
-  description: string;
-  source: string;
+  user?: { name?: string };
 }
 
 // Tavily API for web search
@@ -38,16 +39,16 @@ export async function searchWeb(query: string, apiKey: string): Promise<string> 
 
     // Add answer if available
     if (data.answer) {
-      results += `💡 简要回答: ${data.answer}\n\n`;
+      results += `💡 ${data.answer}\n\n`;
     }
 
     // Add search results
     if (data.results && data.results.length > 0) {
-      results += "🔍 相关链接:\n";
+      results += "🔗 相关链接:\n";
       data.results.forEach((result: SearchResult, i: number) => {
         results += `\n${i + 1}. ${result.title}\n`;
         results += `   ${result.snippet}\n`;
-        results += `   🔗 ${result.url}\n`;
+        results += `   ${result.url}\n`;
       });
     } else {
       results += "\n未找到相关结果。";
@@ -86,8 +87,8 @@ export async function searchImages(query: string, apiKey: string): Promise<strin
 
     data.results.forEach((img: ImageResult, i: number) => {
       results += `${i + 1}. ${img.description || "无描述"}\n`;
-      results += `   🔗 ${img.urls?.regular || img.url}\n`;
-      results += `   📷 摄影师: ${img.user?.name || "未知"}\n\n`;
+      results += `   ${img.urls?.regular || img.url}\n`;
+      results += `   摄影师: ${img.user?.name || "未知"}\n\n`;
     });
 
     return results;
@@ -97,63 +98,41 @@ export async function searchImages(query: string, apiKey: string): Promise<strin
   }
 }
 
-// Parse tool calls from AI response
-export function parseToolCalls(content: string): Array<{ tool: string; args: string }> {
-  const calls: Array<{ tool: string; args: string }> = [];
+// Detect if user message needs search or image search
+export function detectToolNeeds(userMessage: string): { needsSearch: boolean; needsImages: boolean; searchQuery?: string } {
+  const lowerMsg = userMessage.toLowerCase();
 
-  // Match patterns like [搜索:xxx] or [图片:xxx]
-  const searchRegex = /\[搜索:(.*?)\]/g;
-  const imageRegex = /\[图片:(.*?)\]/g;
+  // Image search keywords
+  const imageKeywords = [
+    "图片", "图像", "照片", "截图", "图", "照片", "image", "photo", "picture", "pic",
+    "找点图", "给我看", "有没有图", "来张图", "看看", "展示"
+  ];
 
-  let match;
-  while ((match = searchRegex.exec(content)) !== null) {
-    calls.push({ tool: "search", args: match[1].trim() });
-  }
+  // Search keywords (need fresh info)
+  const searchKeywords = [
+    "搜索", "查一下", "找一下", "最新", "最近", "新闻", "现在", "当前",
+    "2024", "2025", "search", "latest", "recent", "news", "现在是什么"
+  ];
 
-  while ((match = imageRegex.exec(content)) !== null) {
-    calls.push({ tool: "image", args: match[1].trim() });
-  }
+  const needsImages = imageKeywords.some(kw => lowerMsg.includes(kw));
+  const needsSearch = searchKeywords.some(kw => lowerMsg.includes(kw)) ||
+                      (lowerMsg.includes("搜") && !lowerMsg.includes("图片"));
 
-  return calls;
-}
+  // Extract search query (remove the trigger words)
+  let searchQuery = userMessage;
+  imageKeywords.forEach(kw => {
+    searchQuery = searchQuery.replace(new RegExp(kw, "gi"), "").trim();
+  });
+  searchKeywords.forEach(kw => {
+    searchQuery = searchQuery.replace(new RegExp(kw, "gi"), "").trim();
+  });
 
-// Execute tool calls and get formatted results
-export async function executeTools(
-  content: string,
-  searchApiKey: string,
-  imageApiKey: string
-): Promise<{ processedContent: string; toolResults: string[] }> {
-  const calls = parseToolCalls(content);
-  const toolResults: string[] = [];
+  // Clean up common prefixes
+  searchQuery = searchQuery.replace(/^(帮我|给我|能否|可以|帮我搜|搜一下|搜索|查找)/, "").trim();
 
-  if (calls.length === 0) {
-    return { processedContent: content, toolResults: [] };
-  }
-
-  let processedContent = content;
-  const results: Record<string, string> = {};
-
-  // Execute all tool calls
-  for (const call of calls) {
-    let result = "";
-    if (call.tool === "search" && searchApiKey) {
-      result = await searchWeb(call.args, searchApiKey);
-    } else if (call.tool === "image" && imageApiKey) {
-      result = await searchImages(call.args, imageApiKey);
-    }
-
-    const placeholder = `[${call.tool === "search" ? "搜索" : "图片"}:${call.args}]`;
-    results[placeholder] = result;
-    toolResults.push(result);
-
-    // Remove tool call from content
-    processedContent = processedContent.replace(placeholder, "").trim();
-  }
-
-  // Append tool results to content
-  if (toolResults.length > 0) {
-    processedContent = processedContent + "\n\n" + toolResults.join("\n\n");
-  }
-
-  return { processedContent, toolResults };
+  return {
+    needsSearch,
+    needsImages,
+    searchQuery: searchQuery || userMessage
+  };
 }
