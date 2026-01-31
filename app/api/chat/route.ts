@@ -1,7 +1,7 @@
 // Edge Runtime for low latency
 export const runtime = "edge";
 
-import { searchWeb, searchImages, detectToolNeeds } from "@/lib/tools";
+import { searchWeb, searchImages, detectToolNeeds } from "../../lib/tools";
 
 interface Message {
   role: "user" | "assistant" | "system";
