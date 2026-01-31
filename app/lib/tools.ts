@@ -6,11 +6,23 @@ interface SearchResult {
   snippet: string;
 }
 
-interface ImageResult {
-  urls?: { regular?: string };
-  description?: string;
-  url: string;
-  user?: { name?: string };
+interface UnsplashPhoto {
+  id: string;
+  description: string | null;
+  urls: {
+    regular: string;
+    raw: string;
+  };
+  user: {
+    name: string;
+    username: string;
+  };
+}
+
+interface UnsplashResponse {
+  results: UnsplashPhoto[];
+  total: number;
+  total_pages: number;
 }
 
 // Tavily API for web search
@@ -30,7 +42,9 @@ export async function searchWeb(query: string, apiKey: string): Promise<string> 
     });
 
     if (!response.ok) {
-      return `搜索失败: ${response.statusText}`;
+      const errorText = await response.text().catch(() => "Unknown error");
+      console.error("Tavily API error:", response.status, errorText);
+      return `搜索失败: ${response.statusText} - ${errorText}`;
     }
 
     const data = await response.json();
@@ -56,45 +70,57 @@ export async function searchWeb(query: string, apiKey: string): Promise<string> 
 
     return results;
   } catch (error) {
-    console.error("Search error:", error);
-    return `搜索出错: ${error instanceof Error ? error.message : "未知错误"}`;
+    const errorMsg = error instanceof Error ? error.message : "未知错误";
+    console.error("Search error:", errorMsg, error);
+    return `搜索出错: ${errorMsg}`;
   }
 }
 
 // Unsplash API for image search
 export async function searchImages(query: string, apiKey: string): Promise<string> {
   try {
-    const response = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=6`,
-      {
-        headers: {
-          Authorization: `Client-ID ${apiKey}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return `图片搜索失败: ${response.statusText}`;
+    if (!apiKey) {
+      return "图片搜索功能未配置 API Key";
     }
 
-    const data = await response.json();
+    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=6&order_by=relevant`;
+
+    console.log("Fetching Unsplash:", url);
+
+    const response = await fetch(url, {
+      headers: {
+        "Authorization": `Client-ID ${apiKey}`,
+        "Accept-Version": "v1",
+      },
+    });
+
+    console.log("Unsplash response status:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Unknown error");
+      console.error("Unsplash API error:", response.status, errorText);
+      return `图片搜索失败 (${response.status}): ${errorText}`;
+    }
+
+    const data: UnsplashResponse = await response.json();
 
     if (!data.results || data.results.length === 0) {
       return `未找到关于"${query}"的图片。`;
     }
 
-    let results = `🖼️ 图片搜索结果: "${query}"\n\n`;
+    let results = `🖼️ 找到 ${data.total} 张关于 "${query}" 的图片:\n\n`;
 
-    data.results.forEach((img: ImageResult, i: number) => {
-      results += `${i + 1}. ${img.description || "无描述"}\n`;
-      results += `   ${img.urls?.regular || img.url}\n`;
-      results += `   摄影师: ${img.user?.name || "未知"}\n\n`;
+    data.results.forEach((img, i) => {
+      results += `${i + 1}. **${img.description || "无描述"}**\n`;
+      results += `   🔗 ${img.urls.regular}\n`;
+      results += `   📷 by ${img.user.name} (@${img.user.username})\n\n`;
     });
 
     return results;
   } catch (error) {
-    console.error("Image search error:", error);
-    return `图片搜索出错: ${error instanceof Error ? error.message : "未知错误"}`;
+    const errorMsg = error instanceof Error ? error.message : "未知错误";
+    console.error("Image search error:", errorMsg, error);
+    return `图片搜索出错: ${errorMsg}`;
   }
 }
 
