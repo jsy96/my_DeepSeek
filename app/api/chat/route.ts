@@ -1,7 +1,7 @@
 // Edge Runtime for low latency
 export const runtime = "edge";
 
-import { searchWeb, searchImages, detectToolNeeds } from "../../lib/tools";
+import { searchWeb, searchImages, fetchWebPage, detectToolNeeds } from "../../lib/tools";
 import { recognizeImageWithQwen, resizeImage } from "../../lib/vision";
 
 interface Message {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     // Get last user message to detect tool needs
     const lastUserMessage = messages.filter(m => m.role === "user").pop()?.content || "";
-    const { needsSearch, needsImages, searchQuery } = detectToolNeeds(lastUserMessage);
+    const { needsSearch, needsImages, needsWebFetch, searchQuery, webUrl } = detectToolNeeds(lastUserMessage);
 
     // Execute tools if needed
     let toolContext = "";
@@ -40,6 +40,10 @@ export async function POST(request: Request) {
     if (needsImages && imageApiKey && searchQuery) {
       const imageResult = await searchImages(searchQuery, imageApiKey);
       toolContext += `\n\n[图片搜索结果]\n${imageResult}`;
+    }
+    if (needsWebFetch && webUrl) {
+      const webContent = await fetchWebPage(webUrl);
+      toolContext += `\n\n${webContent}`;
     }
 
     // Handle image recognition

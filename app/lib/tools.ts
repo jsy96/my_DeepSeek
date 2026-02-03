@@ -124,9 +124,65 @@ export async function searchImages(query: string, apiKey: string): Promise<strin
   }
 }
 
-// Detect if user message needs search or image search
-export function detectToolNeeds(userMessage: string): { needsSearch: boolean; needsImages: boolean; searchQuery?: string } {
+// Fetch and parse web page content
+export async function fetchWebPage(url: string): Promise<string> {
+  try {
+    // Validate URL
+    let validUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      validUrl = 'https://' + url;
+    }
+
+    console.log("Fetching webpage:", validUrl);
+
+    // Use Jina AI Reader API to extract and convert content to markdown
+    const jinaUrl = `https://r.jina.ai/${validUrl}`;
+
+    const response = await fetch(jinaUrl, {
+      headers: {
+        'Accept': 'text/markdown',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "Unknown error");
+      console.error("Web fetch error:", response.status, errorText);
+      return `网页抓取失败 (${response.status}): ${errorText}`;
+    }
+
+    const content = await response.text();
+
+    // Limit content length to avoid token overflow
+    const maxLength = 8000;
+    const truncatedContent = content.length > maxLength
+      ? content.substring(0, maxLength) + '\n\n...(内容过长，已截断)'
+      : content;
+
+    return `📄 网页内容抓取结果 (${validUrl}):\n\n${truncatedContent}`;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "未知错误";
+    console.error("Web fetch error:", errorMsg, error);
+    return `网页抓取出错: ${errorMsg}`;
+  }
+}
+
+// Detect if user message needs search, image search, or web fetch
+export function detectToolNeeds(userMessage: string): {
+  needsSearch: boolean;
+  needsImages: boolean;
+  needsWebFetch: boolean;
+  searchQuery?: string;
+  webUrl?: string;
+} {
   const lowerMsg = userMessage.toLowerCase();
+
+  // Web fetch keywords and URL patterns
+  const webFetchKeywords = [
+    "抓取", "读取", "解析", "摘要", "总结", "fetch", "extract", "parse", "summarize",
+    "帮我看看这个网站", "分析这个网页", "这个网站讲什么", "网页内容"
+  ];
+
+  const urlPattern = /https?:\/\/[^\s]+|www\.[^\s]+|[a-z0-9-]+\.(com|org|net|edu|io|ai|co|app)[^\s]*/i;
 
   // Image search keywords
   const imageKeywords = [
@@ -140,9 +196,17 @@ export function detectToolNeeds(userMessage: string): { needsSearch: boolean; ne
     "2024", "2025", "search", "latest", "recent", "news", "现在是什么"
   ];
 
+  const needsWebFetch = webFetchKeywords.some(kw => lowerMsg.includes(kw)) || urlPattern.test(userMessage);
   const needsImages = imageKeywords.some(kw => lowerMsg.includes(kw));
   const needsSearch = searchKeywords.some(kw => lowerMsg.includes(kw)) ||
                       (lowerMsg.includes("搜") && !lowerMsg.includes("图片"));
+
+  // Extract URL from message
+  let webUrl = "";
+  const urlMatch = userMessage.match(urlPattern);
+  if (urlMatch) {
+    webUrl = urlMatch[0];
+  }
 
   // Extract search query (remove the trigger words)
   let searchQuery = userMessage;
@@ -152,6 +216,9 @@ export function detectToolNeeds(userMessage: string): { needsSearch: boolean; ne
   searchKeywords.forEach(kw => {
     searchQuery = searchQuery.replace(new RegExp(kw, "gi"), "").trim();
   });
+  webFetchKeywords.forEach(kw => {
+    searchQuery = searchQuery.replace(new RegExp(kw, "gi"), "").trim();
+  });
 
   // Clean up common prefixes
   searchQuery = searchQuery.replace(/^(帮我|给我|能否|可以|帮我搜|搜一下|搜索|查找)/, "").trim();
@@ -159,6 +226,8 @@ export function detectToolNeeds(userMessage: string): { needsSearch: boolean; ne
   return {
     needsSearch,
     needsImages,
-    searchQuery: searchQuery || userMessage
+    needsWebFetch,
+    searchQuery: searchQuery || userMessage,
+    webUrl: webUrl || searchQuery
   };
 }
