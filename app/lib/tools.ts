@@ -124,46 +124,84 @@ export async function searchImages(query: string, apiKey: string): Promise<strin
   }
 }
 
-// Fetch and parse web page content
-export async function fetchWebPage(url: string): Promise<string> {
-  try {
-    // Validate URL
-    let validUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      validUrl = 'https://' + url;
-    }
+// Fetch and parse web page content using Jina AI or Firecrawl
+export async function fetchWebPage(url: string, firecrawlApiKey?: string): Promise<string> {
+  // Validate URL
+  let validUrl = url;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    validUrl = 'https://' + url;
+  }
 
-    console.log("Fetching webpage:", validUrl);
+  console.log("Fetching webpage:", validUrl);
 
-    // Use Jina AI Reader API to extract and convert content to markdown
-    const jinaUrl = `https://r.jina.ai/${validUrl}`;
-
-    const response = await fetch(jinaUrl, {
-      headers: {
-        'Accept': 'text/markdown',
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      console.error("Web fetch error:", response.status, errorText);
-      return `网页抓取失败 (${response.status}): ${errorText}`;
-    }
-
-    const content = await response.text();
-
-    // Limit content length to avoid token overflow
-    const maxLength = 8000;
-    const truncatedContent = content.length > maxLength
+  // Limit content length to avoid token overflow
+  const maxLength = 12000;
+  const truncateContent = (content: string) => {
+    return content.length > maxLength
       ? content.substring(0, maxLength) + '\n\n...(内容过长，已截断)'
       : content;
+  };
 
-    return `📄 网页内容抓取结果 (${validUrl}):\n\n${truncatedContent}`;
+  // Try Jina AI Reader first (free, no API key needed)
+  try {
+    console.log("Trying Jina AI Reader...");
+    const jinaUrl = `https://r.jina.ai/${validUrl}`;
+    const response = await fetch(jinaUrl, {
+      headers: { 'Accept': 'text/markdown' },
+    });
+
+    if (response.ok) {
+      const content = await response.text();
+      // Check if we got meaningful content
+      if (content && content.length > 100) {
+        console.log("Jina AI Reader succeeded");
+        return `📄 网页内容抓取结果 (${validUrl}):\n\n${truncateContent(content)}`;
+      }
+    }
+    console.log("Jina AI Reader failed, trying Firecrawl...");
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : "未知错误";
-    console.error("Web fetch error:", errorMsg, error);
-    return `网页抓取出错: ${errorMsg}`;
+    console.log("Jina AI Reader error:", error);
   }
+
+  // Fallback to Firecrawl if Jina fails
+  if (firecrawlApiKey) {
+    try {
+      console.log("Trying Firecrawl...");
+      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${firecrawlApiKey}`,
+        },
+        body: JSON.stringify({
+          url: validUrl,
+          formats: ['markdown'],
+        }),
+      });
+
+      if (!firecrawlResponse.ok) {
+        const errorText = await firecrawlResponse.text().catch(() => "Unknown error");
+        console.error("Firecrawl error:", firecrawlResponse.status, errorText);
+        return `网页抓取失败 (Jina 和 Firecrawl 都失败了)\nFirecrawl 错误 (${firecrawlResponse.status}): ${errorText}`;
+      }
+
+      const data = await firecrawlResponse.json();
+
+      if (data.success && data.data?.markdown) {
+        console.log("Firecrawl succeeded");
+        return `📄 网页内容抓取结果 (${validUrl}):\n\n${truncateContent(data.data.markdown)}`;
+      }
+
+      return `网页抓取失败: Firecrawl 返回了无效响应`;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "未知错误";
+      console.error("Firecrawl error:", errorMsg, error);
+      return `网页抓取出错: ${errorMsg}`;
+    }
+  }
+
+  // Both methods failed
+  return `网页抓取失败: Jina AI Reader 无法获取该网站内容，且未配置 Firecrawl API Key。\n\n提示: 某些网站可能有反爬虫保护，建议配置 Firecrawl API Key (FIRECRAWL_API_KEY) 来处理复杂网站。`;
 }
 
 // Detect if user message needs search, image search, or web fetch

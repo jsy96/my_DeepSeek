@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const searchApiKey = process.env.TAVILY_API_KEY || "";
     const imageApiKey = process.env.UNSPLASH_ACCESS_KEY || "";
     const visionApiKey = process.env.QWEN_API_KEY || "";
+    const firecrawlApiKey = process.env.FIRECRAWL_API_KEY || "";
 
     const basePrompt = process.env.DEEPSEEK_SYSTEM_PROMPT ||
       "You are a helpful AI assistant.";
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       toolContext += `\n\n[图片搜索结果]\n${imageResult}`;
     }
     if (needsWebFetch && webUrl) {
-      const webContent = await fetchWebPage(webUrl);
+      const webContent = await fetchWebPage(webUrl, firecrawlApiKey);
       toolContext += `\n\n${webContent}`;
     }
 
